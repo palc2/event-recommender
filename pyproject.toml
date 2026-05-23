@@ -18,13 +18,17 @@ dependencies = [
     "pydantic>=2.0",
     "pydantic-settings>=2.0",
     "httpx>=0.28",
+    "flask>=3.0",
+    "truststore>=0.9",
 ]
 
 [project.scripts]
 event-scheduler = "event_scheduler.scheduler:main"
 event-api = "event_scheduler.api:main"
+event-web = "event_scheduler.webapp:main"
 seed-prefs = "event_scheduler.scripts.seed_preferences:main"
 run-agent = "event_scheduler.scripts.run_agent:main"
+oauth-setup = "event_scheduler.scripts.oauth_setup:main"
 
 [build-system]
 requires = ["uv_build>=0.11.2,<0.12.0"]

@@ -136,15 +136,28 @@ def parse_events(raw_content: str, *, today: str) -> list[ParsedEventData]:
 def rerank_events(
     preference_summary: str,
     candidates: list[dict],
+    user_query: str | None = None,
 ) -> list[ScoredEvent]:
+    """Rerank events for a user.
+
+    `preference_summary` is the long-running weighted profile from feedback history.
+    `user_query` is an optional ad-hoc free-text ask for this session
+    ("I want low-key things in Brooklyn this weekend") — when present it should
+    dominate the stored profile.
+    """
     events_text = json.dumps(candidates, indent=2, default=str)
+    parts = [f"User preference profile:\n{preference_summary}"]
+    if user_query and user_query.strip():
+        parts.append(
+            f"Right now the user is specifically asking for:\n{user_query.strip()}\n"
+            "Treat this current ask as the dominant signal — if it conflicts with "
+            "the long-running preference profile, follow the current ask."
+        )
+    parts.append(f"Candidate events:\n{events_text}")
     text = _chat(
         model=settings.llm_rerank_model,
         system=RERANK_SYSTEM,
-        user_msg=(
-            f"User preference profile:\n{preference_summary}\n\n"
-            f"Candidate events:\n{events_text}"
-        ),
+        user_msg="\n\n".join(parts),
     )
     items = _extract_json_array(text)
     return [ScoredEvent(**item) for item in items]

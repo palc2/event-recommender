@@ -7,8 +7,11 @@ from event_scheduler.models import Event
 
 def get_preference_weights(client: Client, user_id: str) -> dict[str, dict[str, float]]:
     """Load all preference weights grouped by type."""
+    # Cloud (SharedMergeTree) rejects FINAL; dedup user_preferences manually.
     rows = client.query(
-        "SELECT preference_type, key, weight FROM user_preferences FINAL "
+        "SELECT preference_type, key, weight FROM "
+        "(SELECT * FROM user_preferences ORDER BY updated_at DESC "
+        " LIMIT 1 BY user_id, preference_type, key) "
         "WHERE user_id = {user_id:String}",
         parameters={"user_id": user_id},
     )

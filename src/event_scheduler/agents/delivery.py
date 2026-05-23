@@ -17,6 +17,11 @@ DEFAULT_USER_ID = "default"
 class DeliveryAgent(BaseAgent):
     name = "delivery"
 
+    def __init__(self, user_id: str = DEFAULT_USER_ID, calendar_id: str = "primary"):
+        super().__init__()
+        self.user_id = user_id
+        self.calendar_id = calendar_id
+
     def _execute(self, client: Client) -> tuple[int, int]:
         delivered, d_failed = self._deliver_pending(client)
         feedback, f_failed = self._poll_rsvps(client)
@@ -29,8 +34,9 @@ class DeliveryAgent(BaseAgent):
             "e.location_name, e.location_address "
             "FROM recommendations r "
             "JOIN events e ON r.event_id = e.event_id "
-            "WHERE r.status = 'pending' "
-            "ORDER BY r.score DESC LIMIT 10"
+            "WHERE r.user_id = {uid:String} AND r.status = 'pending' "
+            "ORDER BY r.score DESC LIMIT 10",
+            parameters={"uid": self.user_id},
         )
         delivered = 0
         failed = 0
@@ -60,6 +66,7 @@ class DeliveryAgent(BaseAgent):
                     end_time=end_str,
                     location=f"{location_name}, {location_address}",
                     rec_id=str(rec_id),
+                    calendar_id=self.calendar_id,
                 )
                 client.command(
                     f"ALTER TABLE recommendations UPDATE "
@@ -78,7 +85,9 @@ class DeliveryAgent(BaseAgent):
         rows = client.query(
             "SELECT rec_id, event_id, calendar_event_id "
             "FROM recommendations "
-            "WHERE status = 'delivered' AND calendar_event_id IS NOT NULL"
+            "WHERE user_id = {uid:String} "
+            "AND status = 'delivered' AND calendar_event_id IS NOT NULL",
+            parameters={"uid": self.user_id},
         )
         processed = 0
         failed = 0
@@ -86,9 +95,11 @@ class DeliveryAgent(BaseAgent):
 
         for rec_id, event_id, cal_event_id in rows.result_rows:
             try:
-                status = get_event_status(cal_event_id)
+                status = get_event_status(cal_event_id, calendar_id=self.calendar_id)
                 if status == "deleted":
-                    self._handle_feedback(client, rec_id, event_id, accepted=False, now=now)
+                    self._handle_feedback(
+                        client, rec_id, event_id, accepted=False, now=now
+                    )
                     processed += 1
             except Exception:
                 logger.exception("Failed to poll RSVP for rec %s", rec_id)
@@ -108,7 +119,7 @@ class DeliveryAgent(BaseAgent):
 
         event = self._load_event(client, event_id)
         if event:
-            update_from_feedback(client, DEFAULT_USER_ID, event, accepted)
+            update_from_feedback(client, self.user_id, event, accepted)
 
     def _load_event(self, client: Client, event_id) -> Event | None:
         rows = client.query(
@@ -116,7 +127,9 @@ class DeliveryAgent(BaseAgent):
             "start_time, end_time, location_name, location_address, "
             "lat, lon, category, tags, price_cents, source, source_url, "
             "image_url, parsed_at "
-            "FROM events FINAL WHERE event_id = {eid:String}",
+            "FROM (SELECT * FROM events ORDER BY parsed_at DESC "
+            "      LIMIT 1 BY content_hash, event_id) "
+            "WHERE event_id = {eid:String}",
             parameters={"eid": str(event_id)},
         )
         if not rows.result_rows:

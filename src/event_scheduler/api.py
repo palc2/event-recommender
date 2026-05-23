@@ -61,7 +61,9 @@ def _load_event(client, event_id) -> Event | None:
         "start_time, end_time, location_name, location_address, "
         "lat, lon, category, tags, price_cents, source, source_url, "
         "image_url, parsed_at "
-        "FROM events FINAL WHERE event_id = {eid:String}",
+        "FROM (SELECT * FROM events ORDER BY parsed_at DESC "
+        "      LIMIT 1 BY content_hash, event_id) "
+        "WHERE event_id = {eid:String}",
         parameters={"eid": str(event_id)},
     )
     if not rows.result_rows:

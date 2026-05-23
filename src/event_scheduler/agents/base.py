@@ -13,6 +13,11 @@ logger = logging.getLogger(__name__)
 class BaseAgent(ABC):
     name: str = "base"
 
+    def __init__(self):
+        # Populated by tick(); lets callers inspect the most recent run
+        # (counts + error) without re-querying ClickHouse.
+        self.last_run: AgentRun | None = None
+
     def tick(self) -> None:
         client = get_client()
         run = AgentRun(
@@ -34,6 +39,7 @@ class BaseAgent(ABC):
             run.completed_at = datetime.now()
             logger.exception("%s tick failed: %s", self.name, exc)
         finally:
+            self.last_run = run
             client.insert(
                 "agent_runs",
                 [[

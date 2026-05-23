@@ -179,7 +179,9 @@ class IngestAgent(BaseAgent):
             return []
         hashes = [url_hash(u) for u in urls]
         existing = client.query(
-            "SELECT url_hash FROM discovered_urls FINAL "
+            "SELECT url_hash FROM "
+            "(SELECT * FROM discovered_urls ORDER BY discovered_at DESC "
+            " LIMIT 1 BY source, url_hash) "
             "WHERE url_hash IN {hashes:Array(UInt64)} "
             "AND last_scraped_at IS NOT NULL "
             "AND last_scraped_at > now() - INTERVAL 24 HOUR",

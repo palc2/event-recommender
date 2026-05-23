@@ -22,8 +22,13 @@ DEFAULT_USER_ID = "default"
 class RecommenderAgent(BaseAgent):
     name = "recommender"
 
+    def __init__(self, user_id: str = DEFAULT_USER_ID, user_query: str | None = None):
+        super().__init__()
+        self.user_id = user_id
+        self.user_query = user_query
+
     def _execute(self, client: Client) -> tuple[int, int]:
-        user_id = DEFAULT_USER_ID
+        user_id = self.user_id
         weights = get_preference_weights(client, user_id)
 
         already_recommended = self._already_recommended_ids(client, user_id)
@@ -57,7 +62,7 @@ class RecommenderAgent(BaseAgent):
         ]
 
         try:
-            reranked = rerank_events(pref_summary, candidate_dicts)
+            reranked = rerank_events(pref_summary, candidate_dicts, user_query=self.user_query)
         except Exception:
             logger.exception("LLM rerank failed, falling back to pre-scores")
             reranked = []
@@ -102,12 +107,15 @@ class RecommenderAgent(BaseAgent):
         return inserted, 0
 
     def _fetch_upcoming_events(self, client: Client) -> list[Event]:
+        # Cloud (SharedMergeTree) rejects FINAL; emulate ReplacingMergeTree
+        # dedup with ORDER BY parsed_at DESC LIMIT 1 BY <key> in a subquery.
         rows = client.query(
             "SELECT event_id, url_hash, content_hash, title, description, "
             "start_time, end_time, location_name, location_address, "
             "lat, lon, category, tags, price_cents, source, source_url, "
             "image_url, parsed_at "
-            "FROM events FINAL "
+            "FROM (SELECT * FROM events ORDER BY parsed_at DESC "
+            "      LIMIT 1 BY content_hash, event_id) "
             "WHERE start_time > now() "
             "ORDER BY start_time LIMIT 200"
         )

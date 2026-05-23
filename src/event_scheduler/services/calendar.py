@@ -29,6 +29,7 @@ def create_event(
     end_time: str | None,
     location: str,
     rec_id: str,
+    calendar_id: str = "primary",
 ) -> str:
     """Create a calendar event and return its ID."""
     service = get_calendar_service()
@@ -44,18 +45,18 @@ def create_event(
     else:
         body["end"] = body["start"]
 
-    result = service.events().insert(calendarId="primary", body=body).execute()
+    result = service.events().insert(calendarId=calendar_id, body=body).execute()
     return result["id"]
 
 
-def get_event_status(calendar_event_id: str) -> str | None:
+def get_event_status(calendar_event_id: str, calendar_id: str = "primary") -> str | None:
     """Check if a calendar event still exists.
     Returns 'active' if present, 'deleted' if removed (reject signal), None on error.
     """
     service = get_calendar_service()
     try:
         event = service.events().get(
-            calendarId="primary", eventId=calendar_event_id
+            calendarId=calendar_id, eventId=calendar_event_id
         ).execute()
         if event.get("status") == "cancelled":
             return "deleted"
