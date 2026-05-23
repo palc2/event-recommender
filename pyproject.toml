@@ -1,0 +1,37 @@
+[project]
+name = "event-scheduler"
+version = "0.1.0"
+description = "Agentic NYC event scheduler: scrapes, recommends, and creates calendar invites"
+readme = "README.md"
+authors = [
+    { name = "MD Islam", email = "md.islam@gemini.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "nimble-python[aiohttp]",
+    "clickhouse-connect>=0.8",
+    "google-api-python-client>=2.0",
+    "google-auth-oauthlib>=1.0",
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.34",
+    "apscheduler>=3.10,<4",
+    "pydantic>=2.0",
+    "pydantic-settings>=2.0",
+    "httpx>=0.28",
+]
+
+[project.scripts]
+event-scheduler = "event_scheduler.scheduler:main"
+event-api = "event_scheduler.api:main"
+seed-prefs = "event_scheduler.scripts.seed_preferences:main"
+run-agent = "event_scheduler.scripts.run_agent:main"
+
+[build-system]
+requires = ["uv_build>=0.11.2,<0.12.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+]
